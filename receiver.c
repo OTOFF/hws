@@ -23,7 +23,7 @@ static inline uint64_t rdtscp64() {
     return __rdtscp(&aux);
 }
 
-#define DEFAULT_THRESHOLD 150
+#define DEFAULT_THRESHOLD 1847
 static int THRESHOLD = DEFAULT_THRESHOLD;
 
 static uint64_t measure_port_contention() {
