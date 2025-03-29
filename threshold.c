@@ -22,6 +22,11 @@ typedef struct {
     long double sum_sq;
 } timing_stats;
 
+static inline uint64_t rdtscp64() {
+    unsigned aux;
+    return __rdtscp(&aux);
+}
+
 void update_stats(timing_stats *stats, uint64_t t) {
     stats->count++;
     stats->sum += t;
@@ -37,16 +42,13 @@ void print_stats(const char *label, timing_stats *stats) {
            label, stats->count, avg, stddev);
 }
 
-// 新增：测量指令时序差异
 void test_instruction_timing(timing_stats *fast, timing_stats *slow) {
     volatile uint64_t a = 1;
     for (int i = 0; i < 100; i++) {
-        // 快速指令（加法）
         uint64_t start = __rdtsc();
         for (int j = 0; j < 10; j++) a += 1;
         update_stats(fast, __rdtsc() - start);
 
-        // 慢速指令（除法）
         start = __rdtsc();
         for (int j = 0; j < 10; j++) a /= 3;
         update_stats(slow, __rdtsc() - start);
@@ -60,15 +62,32 @@ int main(void) {
     timing_stats inst_fast = {0}, inst_slow = {0};
     timing_stats port_int = {0}, port_avx = {0};
 
-    // 原有缓存测试逻辑
-    void *libc_fn = /* ... 获取libc地址 ... */;
+    // 获取libc地址
+    void *handle = dlopen("libc.so.6", RTLD_LAZY);
+    if (!handle) {
+        fprintf(stderr, "dlopen failed\n");
+        return 1;
+    }
+    void *libc_fn = dlsym(handle, "ecvt_r");
+    if (!libc_fn) {
+        fprintf(stderr, "dlsym failed\n");
+        return 1;
+    }
 
     for (int i = 0; i < 100; i++) {
         // 缓存测试
         _mm_clflush(libc_fn);
-        uint64_t start = __rdtsc();
-        /* ... 原有缓存测试代码 ... */
-        update_stats(&cache_flushed, __rdtsc() - start);
+        uint64_t start = rdtscp64();
+        double pi = 3.141592653589793;
+        int decpt = 0, sign = 0;
+        char buf[64];
+        int s = ecvt_r(pi, 20, &decpt, &sign, buf, sizeof(buf));
+        update_stats(&cache_flushed, rdtscp64() - start);
+
+        // 正常缓存访问
+        start = rdtscp64();
+        s = ecvt_r(pi, 20, &decpt, &sign, buf, sizeof(buf));
+        update_stats(&cache_normal, rdtscp64() - start);
 
         // 指令时序测试
         test_instruction_timing(&inst_fast, &inst_slow);
@@ -85,7 +104,6 @@ int main(void) {
         update_stats(&port_avx, __rdtsc() - start);
     }
 
-    // 打印结果
     printf("\n=== Cache Timing ===\n");
     print_stats("Flushed", &cache_flushed);
     print_stats("Normal", &cache_normal);
@@ -98,11 +116,11 @@ int main(void) {
     print_stats("Integer Port", &port_int);
     print_stats("AVX Port", &port_avx);
 
-    // 计算建议阈值
     int suggested_threshold = (int)((cache_flushed.sum / cache_flushed.count + 
                                    inst_slow.sum / inst_slow.count +
                                    port_avx.sum / port_avx.count) / 3);
     printf("\nSuggested threshold: %d cycles\n", suggested_threshold);
 
+    dlclose(handle);
     return 0;
 }
