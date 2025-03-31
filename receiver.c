@@ -5,10 +5,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdbool.h>  // 修复 bool 错误
 
 #define SHM_NAME "/covert_channel"
 #define SAMPLE_WINDOW 100000
-#define THRESHOLD 150  // 缓存命中/未命中的阈值
+#define THRESHOLD 150
 
 volatile char *shared_mem;
 
@@ -22,7 +23,7 @@ bool detect_bit() {
         uint64_t latency = __rdtsc() - t1;
         if (latency > THRESHOLD) miss_count++;
     }
-    return miss_count > (SAMPLE_WINDOW / 5000);  // 调整阈值
+    return miss_count > (SAMPLE_WINDOW / 5000);
 }
 
 int main() {
