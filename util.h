@@ -2,7 +2,8 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#include <string.h>
+#include <stdint.h>      // 添加uint64_t定义
+#include <x86intrin.h>   // 添加__rdtsc和_mm_mfence声明
 
 static inline uint64_t measure_access(volatile char *addr) {
     uint64_t start = __rdtsc();

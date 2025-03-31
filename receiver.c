@@ -6,10 +6,15 @@
 #include <x86intrin.h>
 #include <dlfcn.h>
 #include <stdbool.h>
+#include "util.h"  // 确保包含util.h
+
+#ifndef RTLD_DEFAULT
+#define RTLD_DEFAULT ((void *)0)
+#endif
 
 #define PREAMBLE 0b101011
 #define MAX_MSG_LEN 1024
-#define SAMPLE_WINDOW 1000000  // 1M cycles
+#define SAMPLE_WINDOW 1000000
 #define DEBUG_MODE 1
 
 typedef struct {
@@ -38,11 +43,11 @@ void calibrate(volatile char *addr, Thresholds *t) {
     volatile uint64_t x = 1;
     for (int i = 0; i < 100; i++) {
         uint64_t start = __rdtsc();
-        x += 1;  // 加法
+        x += 1;
         inst_fast += __rdtsc() - start;
         
         start = __rdtsc();
-        x /= 3;  // 除法
+        x /= 3;
         inst_slow += __rdtsc() - start;
     }
     
@@ -65,14 +70,24 @@ bool detect_bit(volatile char *addr, Thresholds *t) {
         uint64_t lat = measure_access(addr);
         if (lat > t->cache_threshold) votes++;
     }
-    
-    return votes > (SAMPLE_WINDOW / 20000);  // 0.5%命中阈值
+    return votes > (SAMPLE_WINDOW / 20000);
 }
 
 int main() {
-    void *libc_func = dlsym(RTLD_DEFAULT, "printf");
-    volatile char *target_addr = (volatile char *)libc_func;
+    void *handle = dlopen("libc.so.6", RTLD_LAZY);
+    if (!handle) {
+        fprintf(stderr, "Error loading libc: %s\n", dlerror());
+        return 1;
+    }
     
+    void *libc_func = dlsym(handle, "printf");
+    if (!libc_func) {
+        fprintf(stderr, "Error finding printf: %s\n", dlerror());
+        dlclose(handle);
+        return 1;
+    }
+
+    volatile char *target_addr = (volatile char *)libc_func;
     Thresholds t;
     calibrate(target_addr, &t);
     
@@ -93,14 +108,12 @@ int main() {
                 bit = detect_bit(target_addr, &t);
                 binary_msg[msg_idx++] = bit ? '1' : '0';
                 
-                // 检测终止符（8个0）
                 if (memcmp(binary_msg + msg_idx - 8, "00000000", 8) == 0) {
                     binary_msg[msg_idx - 8] = '\0';
                     break;
                 }
             }
             
-            // 解码消息
             char ascii_msg[MAX_MSG_LEN/8 + 1];
             binary_to_ascii(binary_msg, ascii_msg);
             printf("Received: %s\n", ascii_msg);
@@ -112,6 +125,7 @@ int main() {
         if (DEBUG_MODE) printf(bit ? "1" : "0");
     }
     
+    dlclose(handle);
     printf("[Receiver] Shutdown\n");
     return 0;
 }
