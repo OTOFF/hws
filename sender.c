@@ -3,6 +3,8 @@
 #include <string.h>
 #include <x86intrin.h>
 #include <dlfcn.h>
+#include <unistd.h>      // 添加sleep声明
+#include <stdbool.h>     // 添加bool类型定义
 
 #define PREAMBLE 0b101011
 #define BIT_INTERVAL 100000  // cycles
