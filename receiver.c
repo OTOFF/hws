@@ -6,7 +6,7 @@
 #include <x86intrin.h>
 #include <dlfcn.h>
 #include <stdbool.h>
-#include "util.h"  // 确保包含util.h
+#include "util.h"
 
 #ifndef RTLD_DEFAULT
 #define RTLD_DEFAULT ((void *)0)
@@ -32,14 +32,12 @@ void calibrate(volatile char *addr, Thresholds *t) {
     uint64_t cache_flush = 0, cache_normal = 0;
     uint64_t inst_fast = 0, inst_slow = 0;
     
-    // 缓存测试
     for (int i = 0; i < 100; i++) {
         _mm_clflush((void *)addr);
         cache_flush += measure_access(addr);
         cache_normal += measure_access(addr);
     }
-    
-    // 指令测试
+
     volatile uint64_t x = 1;
     for (int i = 0; i < 100; i++) {
         uint64_t start = __rdtsc();
@@ -108,7 +106,8 @@ int main() {
                 bit = detect_bit(target_addr, &t);
                 binary_msg[msg_idx++] = bit ? '1' : '0';
                 
-                if (memcmp(binary_msg + msg_idx - 8, "00000000", 8) == 0) {
+                if (msg_idx >= 8 && 
+                    memcmp(binary_msg + msg_idx - 8, "00000000", 8) == 0) {
                     binary_msg[msg_idx - 8] = '\0';
                     break;
                 }
@@ -123,9 +122,10 @@ int main() {
         }
         
         if (DEBUG_MODE) printf(bit ? "1" : "0");
+        fflush(stdout);
     }
     
     dlclose(handle);
-    printf("[Receiver] Shutdown\n");
+    printf("\n[Receiver] Shutdown\n");
     return 0;
 }

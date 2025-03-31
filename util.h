@@ -2,8 +2,9 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#include <stdint.h>      // 添加uint64_t定义
-#include <x86intrin.h>   // 添加__rdtsc和_mm_mfence声明
+#include <stdint.h>      // uint64_t 定义
+#include <x86intrin.h>   // __rdtsc 和 _mm_mfence
+#include <string.h>      // strlen 和 memcmp 声明
 
 static inline uint64_t measure_access(volatile char *addr) {
     uint64_t start = __rdtsc();
@@ -12,7 +13,7 @@ static inline uint64_t measure_access(volatile char *addr) {
     return __rdtsc() - start;
 }
 
-void binary_to_ascii(const char *binary, char *output) {
+static inline void binary_to_ascii(const char *binary, char *output) {
     size_t len = strlen(binary);
     for (size_t i = 0; i < len/8; i++) {
         char byte = 0;
