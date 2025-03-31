@@ -4,10 +4,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <x86intrin.h>
-#include <math.h>
-#include <time.h>
 #include <dlfcn.h>
-#include <stdbool.h>    // 添加bool类型定义
+#include <stdbool.h>
+
+// 确保RTLD_DEFAULT有定义
+#ifndef RTLD_DEFAULT
+#define RTLD_DEFAULT ((void *)0)
+#endif
 
 #define CACHE_MISS_THRESHOLD 1847
 #define PREAMBLE 0b101011
@@ -48,9 +51,21 @@ void binary_to_ascii(const char *binary, char *output) {
 }
 
 int main() {
-    void *libc_func = dlsym(RTLD_DEFAULT, "printf");
-    volatile char *target_addr = (volatile char *)libc_func;
+    // 使用更兼容的libc加载方式
+    void *handle = dlopen("libc.so.6", RTLD_LAZY);
+    if (!handle) {
+        fprintf(stderr, "Error loading libc: %s\n", dlerror());
+        return 1;
+    }
     
+    void *libc_func = dlsym(handle, "printf");
+    if (!libc_func) {
+        fprintf(stderr, "Error finding printf: %s\n", dlerror());
+        dlclose(handle);
+        return 1;
+    }
+
+    volatile char *target_addr = (volatile char *)libc_func;
     uint32_t bit_sequence = 0;
     char binary_msg[MAX_MSG_LEN] = {0};
     int msg_index = 0;
@@ -87,6 +102,7 @@ int main() {
         }
     }
     
+    dlclose(handle);
     printf("Receiver shutdown.\n");
     return 0;
 }
