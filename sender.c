@@ -2,22 +2,25 @@
 #include <stdint.h>
 #include <string.h>
 #include <x86intrin.h>
-#include <dlfcn.h>
-#include <unistd.h>      // 添加sleep声明
-#include <stdbool.h>     // 添加bool类型定义
+#include <dlfcn.h>      // 包含RTLD_DEFAULT定义
+#include <unistd.h>     // sleep()
+#include <stdbool.h>    // bool类型
+
+// 如果RTLD_DEFAULT仍未定义，手动定义
+#ifndef RTLD_DEFAULT
+#define RTLD_DEFAULT ((void *)0)
+#endif
 
 #define PREAMBLE 0b101011
-#define BIT_INTERVAL 100000  // cycles
+#define BIT_INTERVAL 100000
 
 void send_bit(volatile char *addr, bool bit, uint64_t duration) {
     uint64_t start = __rdtsc();
     while ((__rdtsc() - start) < duration) {
         if (bit) {
-            // 制造缓存未命中
             _mm_clflush((void *)addr);
-            for (volatile int i = 0; i < 100; i++); // 增加延迟
+            for (volatile int i = 0; i < 100; i++);
         } else {
-            // 制造缓存命中
             (void)*addr;
             for (volatile int i = 0; i < 10; i++);
         }
@@ -25,7 +28,7 @@ void send_bit(volatile char *addr, bool bit, uint64_t duration) {
 }
 
 void send_message(volatile char *addr, const char *msg) {
-    // 发送前导码
+    // 发送前导码101011
     for (int i = 5; i >= 0; i--) {
         send_bit(addr, (PREAMBLE >> i) & 1, BIT_INTERVAL);
     }
@@ -45,8 +48,12 @@ void send_message(volatile char *addr, const char *msg) {
 
 int main() {
     void *libc_func = dlsym(RTLD_DEFAULT, "printf");
-    volatile char *target_addr = (volatile char *)libc_func;
+    if (!libc_func) {
+        fprintf(stderr, "Failed to find printf function\n");
+        return 1;
+    }
     
+    volatile char *target_addr = (volatile char *)libc_func;
     const char *messages[] = {"Hello", "Covert", "Channel", "exit"};
     
     for (int i = 0; i < sizeof(messages)/sizeof(messages[0]); i++) {
