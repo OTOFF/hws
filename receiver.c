@@ -4,13 +4,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <x86intrin.h>
-#include <dlfcn.h>
+#include <sys/mman.h>
 #include <stdbool.h>
 #include "util.h"
-
-#ifndef RTLD_DEFAULT
-#define RTLD_DEFAULT ((void *)0)
-#endif
 
 #define PREAMBLE 0b101011
 #define MAX_MSG_LEN 1024
@@ -72,38 +68,31 @@ bool detect_bit(volatile char *addr, Thresholds *t) {
 }
 
 int main() {
-    void *handle = dlopen("libc.so.6", RTLD_LAZY);
-    if (!handle) {
-        fprintf(stderr, "Error loading libc: %s\n", dlerror());
-        return 1;
-    }
-    
-    void *libc_func = dlsym(handle, "printf");
-    if (!libc_func) {
-        fprintf(stderr, "Error finding printf: %s\n", dlerror());
-        dlclose(handle);
-        return 1;
-    }
+    // 创建共享内存（必须和 sender 相同）
+    volatile char *shared_mem = mmap(
+        NULL, 4096, PROT_READ | PROT_WRITE,
+        MAP_SHARED | MAP_ANONYMOUS, -1, 0
+    );
+    printf("[Receiver] Shared Memory Address: %p\n", shared_mem);
 
-    volatile char *target_addr = (volatile char *)libc_func;
     Thresholds t;
-    calibrate(target_addr, &t);
+    calibrate(shared_mem, &t);
     
-    printf("[Receiver] Ready (Addr: %p)\n", target_addr);
+    printf("[Receiver] Ready (Addr: %p)\n", shared_mem);
     
     uint32_t bit_seq = 0;
     char binary_msg[MAX_MSG_LEN] = {0};
     int msg_idx = 0;
     
     while (1) {
-        bool bit = detect_bit(target_addr, &t);
+        bool bit = detect_bit(shared_mem, &t);
         bit_seq = ((bit_seq << 1) | bit) & 0x3F;
         
         if ((bit_seq ^ PREAMBLE) == 0) {
             printf("\nPreamble detected!\n");
             
             while (msg_idx < MAX_MSG_LEN - 8) {
-                bit = detect_bit(target_addr, &t);
+                bit = detect_bit(shared_mem, &t);
                 binary_msg[msg_idx++] = bit ? '1' : '0';
                 
                 if (msg_idx >= 8 && 
@@ -125,7 +114,7 @@ int main() {
         fflush(stdout);
     }
     
-    dlclose(handle);
+    munmap((void *)shared_mem, 4096);
     printf("\n[Receiver] Shutdown\n");
     return 0;
 }
