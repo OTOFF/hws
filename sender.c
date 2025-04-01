@@ -1,6 +1,23 @@
-#include "util.h"
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+#include <dlfcn.h>
+#include <x86intrin.h>
 
-bool sequence[8] = {1,0,1,0,1,0,1,1};  // 同步序列
+// ----------- 类型和常量 -----------
+typedef uint64_t ADDR_PTR;
+typedef uint64_t CYCLES;
+#define CACHE_MISS_LATENCY   100
+#define SYNC_INTERVAL        10000
+#define SYNC_SEQUENCE        0b10101011
+
+// ----------- 函数声明 -----------
+CYCLES rdtscp();
+CYCLES cc_sync();
+void clflush(ADDR_PTR addr);
+void send_bit(bool bit, ADDR_PTR addr);
+char *string_to_binary(const char *str);
 
 int main(int argc, char **argv) {
     // 初始化配置（包括目标地址和间隔）
