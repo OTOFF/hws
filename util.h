@@ -1,55 +1,26 @@
-// util.h
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdarg.h>
-#include <getopt.h>
-#include <stdlib.h>
-#include <string.h>
-#include <inttypes.h>
-#include <time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-
-
 #ifndef UTIL_H_
 #define UTIL_H_
 
-#define ADDR_PTR uint64_t
-#define CYCLES uint32_t
+#include <stdint.h>
+#include <stdbool.h>
+#include <x86intrin.h>  // 用于 _mm_clflush 和 __rdtscp
 
-#define CHANNEL_DEFAULT_INTERVAL        0x00008000
-#define CHANNEL_SYNC_TIMEMASK           0x000FFFFF
-#define CHANNEL_SYNC_JITTER             0x0100
+// 类型定义
+typedef uint64_t ADDR_PTR;  // 内存地址类型
+typedef uint64_t CYCLES;    // 时间周期类型
 
-#define DEFAULT_FILE_NAME "/bin/ls"
-#define DEFAULT_FILE_OFFSET	0x0
-#define DEFAULT_FILE_SIZE	4096
-#define CACHE_BLOCK_SIZE	64
-#define MAX_BUFFER_LEN	1024
+// 缓存刷新和时序测量
+void clflush(ADDR_PTR addr);                          // 刷新缓存行
+CYCLES measure_one_block_access_time(ADDR_PTR addr);  // 测量内存访问时间
+CYCLES rdtscp();                                      // 读取时间戳计数器
+CYCLES cc_sync();                                     // 同步时钟周期
 
+// 比特检测和通信配置
+bool detect_bit(ADDR_PTR addr, int interval);         // 检测单个比特
+void send_bit(bool bit, ADDR_PTR addr, int interval); // 发送单个比特
 
-struct config {
-	ADDR_PTR addr;
-	int interval;
-};
-
-CYCLES measure_one_block_access_time(ADDR_PTR addr);
-CYCLES rdtscp(void);
-CYCLES get_time();
-CYCLES cc_sync();
- 
-void clflush(ADDR_PTR addr);
-
-char *string_to_binary(char *s);
-
-char *conv_char(char *data, int size, char *msg);
-
-void init_config(struct config *config, int argc, char **argv);
+// 二进制转换工具
+char *string_to_binary(const char *str);              // 字符串转二进制（ASCII）
+char binary_to_char(const char *binary);              // 8位二进制转字符
 
 #endif
