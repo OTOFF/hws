@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <stdbool.h>  // 修复 bool 错误
+#include <stdbool.h>
 
 #define SHM_NAME "/covert_channel"
 #define BIT_INTERVAL 100000
@@ -33,14 +33,18 @@ int main() {
     shared_mem = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
     printf("[Sender] Shared Memory: %p\n", shared_mem);
 
-    const char *msg = "SECRET";
-    for (int i = 0; msg[i]; i++) {
-        for (int j = 7; j >= 0; j--) {
-            bool bit = (msg[i] >> j) & 1;
-            send_bit(bit);
+    while (1) {  // 无限循环，保持 sender 不退出
+        const char *msg = "SECRET";
+        for (int i = 0; msg[i]; i++) {
+            for (int j = 7; j >= 0; j--) {
+                bool bit = (msg[i] >> j) & 1;
+                send_bit(bit);
+            }
         }
+        sleep(1);  // 每发送完一次后暂停 1 秒
     }
 
+    // 以下代码不会执行（因为 while(1)）
     munmap((void *)shared_mem, 4096);
     shm_unlink(SHM_NAME);
     return 0;
