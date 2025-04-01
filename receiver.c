@@ -1,6 +1,22 @@
-#include "util.h"
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+#include <dlfcn.h>
+#include <x86intrin.h>
 
-int CACHE_MISS_LATENCY = 100;  // 可校准或通过参数传递
+// ----------- 类型和常量 -----------
+typedef uint64_t ADDR_PTR;
+typedef uint64_t CYCLES;
+#define CACHE_MISS_LATENCY   100
+#define SYNC_INTERVAL        10000
+#define SYNC_SEQUENCE        0b10101011
+
+// ----------- 函数声明 -----------
+CYCLES rdtscp();
+CYCLES measure_access_time(ADDR_PTR addr);
+bool detect_bit(ADDR_PTR addr);
+char binary_to_char(const char *binary);
 
 int main(int argc, char **argv) {
     struct config config;
