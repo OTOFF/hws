@@ -1,30 +1,55 @@
 // util.h
-#ifndef UTIL_H
-#define UTIL_H
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdarg.h>
+#include <getopt.h>
+#include <stdlib.h>
+#include <string.h>
+#include <inttypes.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
 
-#include <stdint.h>      // uint64_t 定义
-#include <x86intrin.h>   // __rdtsc 和 _mm_mfence
-#include <string.h>      // strlen 和 memcmp 声明
 
-static inline uint64_t measure_access(volatile char *addr) {
-    uint64_t start = __rdtsc();
-    (void)*addr;
-    _mm_mfence();
-    return __rdtsc() - start;
-}
+#ifndef UTIL_H_
+#define UTIL_H_
 
-static inline void binary_to_ascii(const char *binary, char *output) {
-    size_t len = strlen(binary);
-    for (size_t i = 0; i < len/8; i++) {
-        char byte = 0;
-        for (int j = 0; j < 8; j++) {
-            if (i*8+j < len) {
-                byte = (byte << 1) | (binary[i*8+j] == '1');
-            }
-        }
-        output[i] = byte;
-    }
-    output[len/8] = '\0';
-}
+#define ADDR_PTR uint64_t
+#define CYCLES uint32_t
+
+#define CHANNEL_DEFAULT_INTERVAL        0x00008000
+#define CHANNEL_SYNC_TIMEMASK           0x000FFFFF
+#define CHANNEL_SYNC_JITTER             0x0100
+
+#define DEFAULT_FILE_NAME "/bin/ls"
+#define DEFAULT_FILE_OFFSET	0x0
+#define DEFAULT_FILE_SIZE	4096
+#define CACHE_BLOCK_SIZE	64
+#define MAX_BUFFER_LEN	1024
+
+
+struct config {
+	ADDR_PTR addr;
+	int interval;
+};
+
+CYCLES measure_one_block_access_time(ADDR_PTR addr);
+CYCLES rdtscp(void);
+CYCLES get_time();
+CYCLES cc_sync();
+ 
+void clflush(ADDR_PTR addr);
+
+char *string_to_binary(char *s);
+
+char *conv_char(char *data, int size, char *msg);
+
+void init_config(struct config *config, int argc, char **argv);
 
 #endif
